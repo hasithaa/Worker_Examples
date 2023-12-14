@@ -221,7 +221,7 @@ service / on new http:Listener(9090) {
     }
 
     // Case 6 - Case 5 with error handlers, but without http Caller. 
-    resource function get case6/doctor/[string doctorType]() returns error? {
+    resource function get case6/doctor/[string doctorType]() returns json|error? {
 
         // Cloned paths
         worker callGrandOak {
@@ -253,15 +253,7 @@ service / on new http:Listener(9090) {
             json res2 = check <- callPineValley;
             // Code Block or Aggregated Node
             json mergedRes = check value:mergeJson(res1, res2);
-            mergedRes -> respond;
-        } on fail var e {
-            e -> errorHandler;
-        }
-
-        worker respond {
-            json j = <- merge;
-            _ = check caller->respond(j);
-            () -> function;
+            mergedRes -> function;
         } on fail var e {
             e -> errorHandler;
         }
@@ -281,19 +273,12 @@ service / on new http:Listener(9090) {
         worker createError {
             _ = <- errorHandler;
             json j = {message: "Error occurred"};
-            j -> respondError;
-        }
-
-        worker respondError {
-            json j = <- createError;
-            _ = check caller->respond(j);
-            () -> function;
-        } on fail {
-            // Ignore
+            j -> function;
         }
 
         () -> callGrandOak;
         () -> buildPineValleyPayload;
-        _ = check <- respond | errorHandler | logError;
+        json j = check <- merge | createError;
+        return j;
     }
 }
