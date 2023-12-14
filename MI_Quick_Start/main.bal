@@ -219,4 +219,81 @@ service / on new http:Listener(9090) {
         () -> callGrandOak;
         () -> buildPineValleyPayload;
     }
+
+    // Case 6 - Case 5 with error handlers, but without http Caller. 
+    resource function get case6/doctor/[string doctorType]() returns error? {
+
+        // Cloned paths
+        worker callGrandOak {
+            _ = <- function;
+            json res = check grandOakEp->get("/doctors/" + doctorType);
+            res -> merge;
+        } on fail var e {
+            e -> errorHandler;
+        }
+
+        worker buildPineValleyPayload {
+            _ = <- function;
+            PineValleyPayload payload = {doctorType: doctorType};
+            payload -> callPineValley;
+        } on fail var e {
+            e -> errorHandler;
+        }
+
+        worker callPineValley {
+            PineValleyPayload payload = <- buildPineValleyPayload;
+            json res = check pineValleyEp->post("/doctors/", payload);
+            res -> merge;
+        } on fail var e {
+            e -> errorHandler;
+        }
+
+        worker merge {
+            json res1 = check <- callGrandOak;
+            json res2 = check <- callPineValley;
+            // Code Block or Aggregated Node
+            json mergedRes = check value:mergeJson(res1, res2);
+            mergedRes -> respond;
+        } on fail var e {
+            e -> errorHandler;
+        }
+
+        worker respond {
+            json j = <- merge;
+            _ = check caller->respond(j);
+            () -> function;
+        } on fail var e {
+            e -> errorHandler;
+        }
+
+        worker errorHandler {
+            error e = <- callGrandOak | buildPineValleyPayload | callPineValley | merge | respond;
+            e -> logError;
+            () -> createError;
+        }
+
+        worker logError {
+            error e = <- errorHandler;
+            log:printError("Error occurred", e);
+            () -> function;
+        }
+
+        worker createError {
+            _ = <- errorHandler;
+            json j = {message: "Error occurred"};
+            j -> respondError;
+        }
+
+        worker respondError {
+            json j = <- createError;
+            _ = check caller->respond(j);
+            () -> function;
+        } on fail {
+            // Ignore
+        }
+
+        () -> callGrandOak;
+        () -> buildPineValleyPayload;
+        _ = check <- respond | errorHandler | logError;
+    }
 }
