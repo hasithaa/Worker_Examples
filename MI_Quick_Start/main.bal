@@ -281,4 +281,65 @@ service / on new http:Listener(9090) {
         json j = check <- merge | createError;
         return j;
     }
+
+
+    // Final 
+    resource function get doctor/[string doctorType]() returns json|error? {
+
+        @display {
+            templateID : "httpRequestNode"
+        }
+        worker callGrandOak returns error?{
+            _ = check <- function;
+            json res = check grandOakEp->get("/doctors/" + doctorType);
+            res -> mergeResults;
+        }
+
+        @display {
+            templateID : "payload"
+        }
+        worker buildPineValleyPayload returns error? {
+            _ = check <- function;
+            PineValleyPayload payload = {doctorType: doctorType};
+            payload -> callPineValley;
+        } 
+
+        @display {
+            templateID : "httpRequestNode"
+        }
+        worker callPineValley returns error? {
+            PineValleyPayload payload = check <- buildPineValleyPayload;
+            json res = check pineValleyEp->post("/doctors/", payload);
+            res -> mergeResults;
+        }
+
+        @display {
+            templateID : "transformNode"
+        }
+        worker mergeResults returns error? {
+            // Option 1 - Support later
+            // record {json callGrandOak; json callPineValley;} res = check <- { callGrandOak, callPineValley }
+
+            // Option 2
+            json j1 = check <- callGrandOak;
+            json j2 = check <- callPineValley;
+
+            json res = transformFunction(j1, j2);
+            res -> respond;
+        }
+
+        @display {
+            templateID : "httpRespond"
+        }
+        worker respond returns error? {
+            json j = check <- mergeResults
+            j -> function;
+        } 
+
+        json j = check <- respond;
+        return j;
+    }
 }
+
+function transformFunction(json j1, json j2) return json => value:mergeJson(src.callGrandOak, src.callPineValley);
+
