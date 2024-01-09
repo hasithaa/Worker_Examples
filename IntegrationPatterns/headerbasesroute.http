@@ -1,0 +1,10 @@
+GET http://localhost:9090/route1
+X-url: com
+
+###
+GET http://localhost:9090/route2
+X-url: com
+
+###
+GET http://localhost:9090/route3
+X-url: com
