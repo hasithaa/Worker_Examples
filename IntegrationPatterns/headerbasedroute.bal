@@ -1,5 +1,4 @@
 import ballerina/http;
-import ballerina/io;
 
 final http:Client exampleCom = check new ("http://example.com"); // Step 1
 final http:Client exampleNet = check new ("http://example.net"); // Step 2
@@ -52,7 +51,7 @@ service / on new http:Listener(9090) {
 
         worker startNode {
             _ = <- function;
-            () -> GetHeader;
+            1 -> GetHeader;
         }
 
         worker GetHeader returns error? {   // Step 2
@@ -64,44 +63,39 @@ service / on new http:Listener(9090) {
         worker Switch returns error? { // Step 3
             string url = check <- GetHeader;
             if url == "com" {
-                () -> callCom;
+                1 -> callCom;
             } else if url == "net" {
-                () -> callNet;
+                1 -> callNet;
             } else {
-                () -> sendNotFound;
+                1 -> sendNotFound;
             }
         }
 
         worker callCom returns error? { // Step 4
             _ = check <- Switch;
             res = <http:Response>check exampleCom->get("/");
-            io:println("Response from example.com");
-            () -> sendResponse;
+            1 -> sendResponse;
         }
 
         worker callNet returns error? { // Step 4
             _ = check <- Switch;
             res = <http:Response>check exampleNet->get("/");
-            io:println("Response from example.net");
-            () -> sendResponse;
+            1 -> sendResponse;
         }
 
         worker sendNotFound returns error? { // Step 5
             _ = check <- Switch;
             res = http:NOT_FOUND;
-            () -> sendResponse;
+            1 -> sendResponse;
         }
 
         worker sendResponse {
-            error? e =  <- callCom | callNet | sendNotFound; // Can't use check here.
-            io:println("Returning response");
+            error|int e =  <- callCom | callNet | sendNotFound; // Can't use check here.
             () -> function;
         }
 
         () -> startNode;
-        io:println("Waiting for response");
         error? e = <- sendResponse;
-        io:println("Sending response");
         return res;
     }
 }
