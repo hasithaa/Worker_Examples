@@ -89,13 +89,13 @@ service / on new http:Listener(9090) {
             1 -> sendResponse;
         }
 
-        worker sendResponse {
-            error|int e =  <- callCom | callNet | sendNotFound; // Can't use check here.
+        worker sendResponse returns error? {
+            _ = check <- callCom | callNet | sendNotFound;
             () -> function;
         }
 
         () -> startNode;
-        error? e = <- sendResponse;
+        _ = check <- sendResponse;
         return res;
     }
 }
